@@ -66,6 +66,11 @@
   </p>
   <input type="file" id="targets-csv" accept=".csv">
   <div id="targets-preview"></div>
+  <div class="targets-toolbar" id="targets-toolbar">
+    <button type="button" id="add-row-btn" class="button button-small">+ Add row</button>
+    <button type="button" id="clear-targets-btn" class="button button-small">Clear all</button>
+  </div>
+  <p class="hint" id="targets-edit-hint" hidden>Click any cell to edit it. Changes apply when you Dry Run / Flash Now.</p>
   <table class="status-table" id="targets-table" hidden>
     <thead><tr id="targets-table-head"></tr></thead>
     <tbody id="targets-table-body"></tbody>

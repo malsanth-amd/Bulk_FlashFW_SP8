@@ -3,16 +3,22 @@
 // Qt signals driving widgets directly, we open an EventSource (SSE) onto
 // /api/jobs/{id}/stream and update the DOM as lines arrive.
 
-let targetsFile = null;
-let targetsRowCount = 0;
+// Targets are held as parsed data (headers + rows), not the raw uploaded
+// file - this is what makes the preview table editable in place: any edit/
+// remove/add updates this in-memory state directly, and the actual CSV
+// sent to the server is re-serialized from it at submit time (see
+// rowsToCsv() in startFlashJob), rather than always re-sending the
+// original file untouched.
+let targetsHeaders = [];
+let targetsRows = [];
 let activeJobId = null;
 let activeEventSource = null;
 
 const el = (id) => document.getElementById(id);
 
-// Minimal CSV parser - the targets CSV is always a simple, unquoted format
-// (see systems_template.csv), so a plain split is enough; no need for a
-// full RFC-4180 parser here.
+// Minimal CSV parser/serializer - the targets CSV is always a simple,
+// unquoted format (see systems_template.csv), so a plain split/join is
+// enough; no need for a full RFC-4180 parser here.
 function parseCsv(text) {
   const lines = text.trim().split("\n").filter((l) => l.trim().length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
@@ -21,34 +27,74 @@ function parseCsv(text) {
   return { headers, rows };
 }
 
-function renderTargetsPreview(headers, rows) {
+function rowsToCsv(headers, rows) {
+  return [headers.join(","), ...rows.map((r) => headers.map((_, i) => r[i] ?? "").join(","))].join("\n") + "\n";
+}
+
+function renderTargetsTable() {
   const table = el("targets-table");
   const head = el("targets-table-head");
   const body = el("targets-table-body");
-  head.innerHTML = headers.map((h) => `<th>${h}</th>`).join("");
-  body.innerHTML = rows.map((row) =>
-    `<tr>${headers.map((_, i) => `<td>${row[i] ?? ""}</td>`).join("")}</tr>`
+  const hasRows = targetsRows.length > 0;
+
+  head.innerHTML = targetsHeaders.map((h) => `<th>${h}</th>`).join("") + "<th></th>";
+  body.innerHTML = targetsRows.map((row, rowIdx) =>
+    `<tr>${targetsHeaders.map((_, colIdx) =>
+      `<td><input type="text" class="target-cell" value="${(row[colIdx] ?? "").replace(/"/g, "&quot;")}" data-row="${rowIdx}" data-col="${colIdx}"></td>`
+    ).join("")}<td><button type="button" class="fw-clear-btn target-remove-btn" data-row="${rowIdx}" title="Remove this system">&times;</button></td></tr>`
   ).join("");
-  table.hidden = rows.length === 0;
+
+  table.hidden = !hasRows;
+  el("targets-edit-hint").hidden = !hasRows;
+}
+
+function loadTargetsFromCsvText(text, sourceLabel) {
+  const { headers, rows } = parseCsv(text);
+  targetsHeaders = headers;
+  targetsRows = rows;
+  el("targets-preview").textContent = `${rows.length} target system(s) loaded from ${sourceLabel}`;
+  renderTargetsTable();
+  updateRunGating();
 }
 
 el("targets-csv").addEventListener("change", (e) => {
-  targetsFile = e.target.files[0] || null;
-  const preview = el("targets-preview");
-  if (!targetsFile) {
-    preview.textContent = "";
-    renderTargetsPreview([], []);
-    targetsRowCount = 0;
-    updateRunGating();
-    return;
-  }
-  targetsFile.text().then((text) => {
-    const { headers, rows } = parseCsv(text);
-    targetsRowCount = rows.length;
-    preview.textContent = `${rows.length} target system(s) loaded from ${targetsFile.name}`;
-    renderTargetsPreview(headers, rows);
-    updateRunGating();
-  });
+  const file = e.target.files[0];
+  if (!file) return;
+  file.text().then((text) => loadTargetsFromCsvText(text, file.name));
+});
+
+// Inline edit: typing in any cell updates the in-memory row directly.
+el("targets-table-body").addEventListener("input", (e) => {
+  if (!e.target.classList.contains("target-cell")) return;
+  const row = Number(e.target.dataset.row);
+  const col = Number(e.target.dataset.col);
+  targetsRows[row][col] = e.target.value;
+});
+
+// Remove a single system.
+el("targets-table-body").addEventListener("click", (e) => {
+  if (!e.target.classList.contains("target-remove-btn")) return;
+  const row = Number(e.target.dataset.row);
+  targetsRows.splice(row, 1);
+  el("targets-preview").textContent = `${targetsRows.length} target system(s) loaded`;
+  renderTargetsTable();
+  updateRunGating();
+});
+
+el("add-row-btn").addEventListener("click", () => {
+  if (targetsHeaders.length === 0) targetsHeaders = ["system_name", "bmc_ip", "platform"];
+  targetsRows.push(targetsHeaders.map(() => ""));
+  renderTargetsTable();
+  updateRunGating();
+});
+
+el("clear-targets-btn").addEventListener("click", () => {
+  targetsRows = [];
+  targetsHeaders = [];
+  el("targets-csv").value = "";
+  el("targets-preview").textContent = "";
+  renderTargetsTable();
+  updateRunGating();
 });
 
 el("confirm-flash").addEventListener("change", updateRunGating);
@@ -168,8 +214,8 @@ el("stop-btn").addEventListener("click", async () => {
 });
 
 async function startFlashJob(dryRun) {
-  if (!targetsFile) {
-    appendLog("ERROR: upload a targets CSV first.");
+  if (targetsRows.length === 0) {
+    appendLog("ERROR: add or upload at least one target system first.");
     return;
   }
   const triggeringBtn = el(dryRun ? "dry-run-btn" : "flash-now-btn");
@@ -180,8 +226,9 @@ async function startFlashJob(dryRun) {
   clearStatusTable();
   appendLog(dryRun ? "=== Starting dry run ===" : "=== Starting FLASH NOW ===");
 
+  const csvBlob = new Blob([rowsToCsv(targetsHeaders, targetsRows)], { type: "text/csv" });
   const form = new FormData();
-  form.append("targets_csv", targetsFile);
+  form.append("targets_csv", csvBlob, "targets.csv");
   form.append("dry_run", dryRun ? "true" : "false");
   if (el("bmc-user").value) form.append("bmc_user", el("bmc-user").value);
   if (el("bmc-pass").value) form.append("bmc_pass", el("bmc-pass").value);
@@ -245,19 +292,19 @@ function streamJob(jobId, onDone) {
 }
 
 function setRunButtonsEnabled(enabled) {
-  el("dry-run-btn").disabled = !enabled || !targetsFile;
-  el("flash-now-btn").disabled = !enabled || !el("confirm-flash").checked || !targetsFile;
+  el("dry-run-btn").disabled = !enabled || targetsRows.length === 0;
+  el("flash-now-btn").disabled = !enabled || !el("confirm-flash").checked || targetsRows.length === 0;
 }
 
 function updateRunGating() {
   setRunButtonsEnabled(true);
   const hint = el("run-hint");
-  if (!targetsFile) {
-    hint.textContent = "Upload a target CSV above to enable Dry Run / Flash Now.";
+  if (targetsRows.length === 0) {
+    hint.textContent = "Upload a target CSV (or add a row) above to enable Dry Run / Flash Now.";
   } else if (!el("confirm-flash").checked) {
-    hint.textContent = `${targetsRowCount} target system(s) loaded. Check the box above to enable Flash Now (Dry Run is always safe).`;
+    hint.textContent = `${targetsRows.length} target system(s) loaded. Check the box above to enable Flash Now (Dry Run is always safe).`;
   } else {
-    hint.textContent = `${targetsRowCount} target system(s) loaded - ready to flash.`;
+    hint.textContent = `${targetsRows.length} target system(s) loaded - ready to flash.`;
   }
 }
 
