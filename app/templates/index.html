@@ -29,13 +29,18 @@
     platform matches - a multi-platform batch never gets one platform's firmware applied to another's systems.
   </p>
   {% for board in board_codes %}
-  <details class="fw-override">
-    <summary>{{ board }}</summary>
+  <details class="fw-override" data-board="{{ board }}">
+    <summary>{{ board }} <span class="fw-override-badge" hidden></span></summary>
     <div class="fw-override-list">
       {% for component, label in [("bios", "BIOS"), ("bmc", "BMC"), ("hpm", "FPGA (HPM)")] %}
-      <div class="fw-override-row">
-        <span class="fw-override-label">{{ label }}</span>
-        <input type="file" class="fw-file" data-board="{{ board }}" data-component="{{ component }}">
+      <div class="fw-override-row-wrap">
+        <div class="fw-override-row">
+          <span class="fw-override-label">{{ label }}</span>
+          <input type="file" class="fw-file" data-board="{{ board }}" data-component="{{ component }}">
+          <span class="fw-override-filename"></span>
+          <button type="button" class="fw-clear-btn" hidden title="Remove this file">&times;</button>
+        </div>
+        <p class="fw-override-warning" hidden></p>
       </div>
       {% endfor %}
     </div>

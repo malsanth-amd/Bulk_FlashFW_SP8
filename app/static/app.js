@@ -53,6 +53,77 @@ el("targets-csv").addEventListener("change", (e) => {
 
 el("confirm-flash").addEventListener("change", updateRunGating);
 
+// Manual firmware override: show the real (untruncated) filename next to
+// each file input, a clear (x) button once one's picked, a per-board badge
+// on the collapsed <summary>, and a non-blocking heuristic warning if the
+// chosen filename LOOKS like it belongs to a different component.
+//
+// This is a filename-pattern heuristic only, not real content/extension
+// sniffing - it can't catch a file that's been renamed to look legitimate,
+// and it never blocks the upload (false positives on an unfamiliar naming
+// scheme shouldn't stop a real flash). It's a safety-net nudge, matched
+// against the actual naming conventions seen on the real BKC page/share
+// this session: BMC images contain "obmc"/"phosphor" and end in
+// ".mtd.tar"; FPGA images contain "_FPGA_"/"_HPMFPGA_"; BIOS images are a
+// short letter prefix followed by a digit-leading alphanumeric body (e.g.
+// "REAV0080I", "WEAV6A28N" - see BIOS_FILENAME_RE in refresh_recipe_bkc_page.py).
+const FW_SHAPE_PATTERNS = {
+  bmc: /obmc|phosphor|\.mtd\.tar$/i,
+  hpm: /_fpga_|_hpmfpga_/i,
+  bios: /^[a-z]{3,6}[0-9][0-9a-z]{2,6}\b/i,
+};
+const FW_COMPONENT_LABELS = { bios: "BIOS", bmc: "BMC", hpm: "FPGA (HPM)" };
+
+function detectFirmwareMismatch(expectedComponent, filename) {
+  for (const [component, pattern] of Object.entries(FW_SHAPE_PATTERNS)) {
+    if (component !== expectedComponent && pattern.test(filename)) {
+      return `"${filename}" looks like a ${FW_COMPONENT_LABELS[component]} file, not ${FW_COMPONENT_LABELS[expectedComponent]} - double check before flashing.`;
+    }
+  }
+  return null;
+}
+
+document.querySelectorAll(".fw-file").forEach((input) => {
+  const wrap = input.closest(".fw-override-row-wrap");
+  const nameSpan = wrap.querySelector(".fw-override-filename");
+  const clearBtn = wrap.querySelector(".fw-clear-btn");
+  const warningP = wrap.querySelector(".fw-override-warning");
+
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    nameSpan.textContent = file ? file.name : "";
+    nameSpan.title = file ? file.name : "";
+    clearBtn.hidden = !file;
+    const mismatch = file ? detectFirmwareMismatch(input.dataset.component, file.name) : null;
+    warningP.textContent = mismatch || "";
+    warningP.hidden = !mismatch;
+    updateOverrideBadge(input.dataset.board);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    nameSpan.textContent = "";
+    nameSpan.title = "";
+    clearBtn.hidden = true;
+    warningP.hidden = true;
+    updateOverrideBadge(input.dataset.board);
+  });
+});
+
+function updateOverrideBadge(board) {
+  const details = document.querySelector(`.fw-override[data-board="${board}"]`);
+  const count = details.querySelectorAll(".fw-file").length
+    ? Array.from(details.querySelectorAll(".fw-file")).filter((i) => i.files.length > 0).length
+    : 0;
+  const badge = details.querySelector(".fw-override-badge");
+  if (count > 0) {
+    badge.textContent = `${count} file${count > 1 ? "s" : ""} set`;
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
 el("toggle-pass-btn").addEventListener("click", () => {
   const input = el("bmc-pass");
   const btn = el("toggle-pass-btn");

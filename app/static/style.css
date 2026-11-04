@@ -63,10 +63,33 @@ input[type=text], input[type=password] { padding: 0.3rem; margin-left: 0.4rem; }
 .login-box { text-align: center; margin-top: 4rem; }
 .fw-override { border: 1px solid #e0e0e0; border-radius: 4px; padding: 0.5rem 0.9rem 0.7rem; margin-bottom: 0.5rem; }
 .fw-override summary { cursor: pointer; font-weight: 600; padding: 0.2rem 0; }
+.fw-override-badge {
+  font-weight: 400; font-size: 0.78rem; color: #1a5fb4; background: #e8f0fc;
+  border-radius: 10px; padding: 0.1rem 0.55rem; margin-left: 0.4rem;
+}
 .fw-override-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
-.fw-override-row { display: flex; align-items: center; gap: 1rem; }
+.fw-override-row-wrap { display: flex; flex-direction: column; gap: 0.2rem; }
+.fw-override-row { display: flex; align-items: center; gap: 0.6rem; }
+.fw-override-warning {
+  margin: 0 0 0 100px; padding: 0.2rem 0.5rem; font-size: 0.78rem;
+  color: #8a5a00; background: #fff6e0; border: 1px solid #f0d890; border-radius: 3px;
+  max-width: 420px;
+}
 .fw-override-label { width: 90px; flex-shrink: 0; font-size: 0.88rem; color: #333; }
-.fw-override-row input[type=file] { font-size: 0.82rem; max-width: 260px; }
+/* Clip the native "No file chosen" text (which truncates unhelpfully) down
+   to just the button - our own .fw-override-filename span shows the real
+   selected name instead, with a hover tooltip for anything still too long. */
+.fw-override-row input[type=file] { font-size: 0.82rem; width: 110px; overflow: hidden; flex-shrink: 0; }
+.fw-override-filename {
+  font-size: 0.82rem; color: #333; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 260px;
+}
+.fw-override-filename:empty::before { content: "No file chosen"; color: #888; }
+.fw-clear-btn {
+  border: none; background: none; color: #888; font-size: 1.1rem; line-height: 1;
+  cursor: pointer; padding: 0 0.3rem;
+}
+.fw-clear-btn:hover { color: #c0392b; }
 .password-field { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: 0.4rem; }
 .password-field input[type=password], .password-field input[type=text] { margin-left: 0; }
 .button-small { padding: 0.2rem 0.5rem; font-size: 0.78rem; }
