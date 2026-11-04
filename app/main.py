@@ -33,6 +33,23 @@ app = FastAPI(title="FlashTools Web")
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET_KEY, same_site="lax")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
+
+# Cache-busting: browsers happily cache /static/app.js and style.css with
+# no revalidation, which makes a real edit look like it "didn't take" until
+# a hard refresh - hit this exact symptom live this session, on both the
+# dev side and a user's own browser. Tying a ?v= query string to the static
+# files' own mtime means a plain page reload picks up any real change
+# immediately, since the browser treats a different URL as a different
+# resource. Computed fresh on every render (not cached at import time) so
+# this works even without restarting the server - just re-saving a static
+# file and reloading the page is enough.
+def _static_version() -> str:
+    static_dir = APP_DIR / "static"
+    mtimes = [f.stat().st_mtime for f in static_dir.rglob("*") if f.is_file()]
+    return str(int(max(mtimes))) if mtimes else "0"
+
+
+templates.env.globals["static_version"] = _static_version
 app.include_router(auth.router)
 
 jobs = JobManager()
