@@ -149,6 +149,7 @@ async def start_flash_job(
     dry_run: bool = True,  # sent as a query param (see app.js) - fine unannotated alongside Form(...) fields below
     bmc_user: str = Form(""),
     bmc_pass: str = Form(""),
+    fvddr_token: str = Form(""),
     user: dict = Depends(auth.require_login_api),
 ):
     csv_bytes = await targets_csv.read()
@@ -221,6 +222,8 @@ async def start_flash_job(
         cmd += ["--dry-run"]
     else:
         cmd += ["-y"]
+    if fvddr_token:
+        cmd += ["--fvddr-token", fvddr_token]
 
     job = jobs.start(cmd, owner=user["oid"], kind="flash")
     return {"job_id": job.id, "cmd_display": " ".join(redact_cmd_for_display(cmd))}

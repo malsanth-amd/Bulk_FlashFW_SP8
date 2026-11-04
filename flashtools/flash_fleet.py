@@ -90,6 +90,8 @@ def build_cmd(row, args):
         cmd += ["--bmc-user", row["bmc_user"]]
     if row.get("bmc_pass"):
         cmd += ["--bmc-pass", row["bmc_pass"]]
+    if getattr(args, "fvddr_token", None):
+        cmd += ["--fvddr-token", args.fvddr_token]
     if args.dry_run:
         cmd += ["--dry-run"]
     if args.yes:
@@ -156,6 +158,10 @@ def main():
     parser.add_argument("--bmc-version", default=None, help="Expected version label for --bmc-file (used for verification; omit to skip it)")
     parser.add_argument("--hpm-version", default=None, help="Expected version label for --hpm-file")
     parser.add_argument("--bios-version", default=None, help="Expected version label for --bios-file")
+    parser.add_argument("--fvddr-token", default=None,
+                         help="X-Admin-Token for the FVDDR System Tracker's AC-cycle API, forwarded to every "
+                              "system in the batch (same deployment/token for a whole fleet run) - only needed "
+                              "if that FVDDR instance requires one; omit otherwise")
     parser.add_argument("--refresh-recipe", action="store_true", help="Refresh recipe.yaml ONCE before dispatching (not per-system)")
     parser.add_argument("--recipe-source", default="nexus",
                          choices=["nexus", "fileshare", "fpga-manual", "fpga-confluence", "fpga-confluence-browser",

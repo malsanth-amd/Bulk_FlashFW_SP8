@@ -232,6 +232,7 @@ async function startFlashJob(dryRun) {
   form.append("dry_run", dryRun ? "true" : "false");
   if (el("bmc-user").value) form.append("bmc_user", el("bmc-user").value);
   if (el("bmc-pass").value) form.append("bmc_pass", el("bmc-pass").value);
+  if (el("fvddr-token").value) form.append("fvddr_token", el("fvddr-token").value);
 
   // Manual firmware override: any file the user picked under "1b." gets
   // sent as fw_<board>_<component>, matched server-side to only the rows
