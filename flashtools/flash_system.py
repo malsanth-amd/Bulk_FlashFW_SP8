@@ -700,7 +700,24 @@ def ac_cycle(args, bmc_ip=None, bmc_user=None, bmc_pass=None):
                 f"without understanding what state the PDU/outlet was left in."
             )
     else:
-        input("  >>> Please AC power-cycle the system now, then press Enter to continue ...")
+        try:
+            input("  >>> Please AC power-cycle the system now, then press Enter to continue ...")
+        except EOFError:
+            # stdin is closed/empty - there's no one at a terminal to answer this
+            # prompt (always true for a background/web-triggered flash, since that
+            # subprocess's stdin is deliberately DEVNULL). Raise a clear, actionable
+            # error instead of letting the cryptic raw EOFError propagate - this is
+            # a configuration gap (no automated AC-cycle method set up for this
+            # system), not a transient failure.
+            raise RuntimeError(
+                "No automated AC-cycle method is configured for this system "
+                "(--ac-cycle-cmd / FVDDR ac_cycle.py / --pdu-vendor+--pdu-ip), and no "
+                "interactive terminal is attached to answer the manual power-cycle "
+                "prompt (stdin is closed - expected for an unattended or web-triggered "
+                "flash). Configure one of the automated AC-cycle options before running "
+                "this system from a non-interactive context; the manual prompt only "
+                "works when this script is run directly in a real terminal."
+            )
 
 
 # ----------------------------------------------------------------------------
