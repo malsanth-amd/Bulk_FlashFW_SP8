@@ -24,6 +24,9 @@ flashtools/recipe.yaml.bak
 # Local dev-only Claude Code preview config, not part of the app.
 .claude/
 
+# Weekly scheduler's runtime state (last-run timestamp/status) - not source.
+app/.scheduler_state.json
+
 # Local scratch
 *.log
 *.bak

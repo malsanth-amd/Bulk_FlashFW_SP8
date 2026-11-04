@@ -19,6 +19,16 @@
     </tbody>
   </table>
   <button id="refresh-btn" class="button">Refresh firmware from BKC page</button>
+  <p class="hint">
+    Also refreshes automatically every Sunday at 01:00 (server time).
+    {% if scheduler_info and scheduler_info.last_run_at %}
+      Last auto-refresh: {{ scheduler_info.last_run_at.split("T")[0] }} {{ scheduler_info.last_run_at.split("T")[1][:5] }}
+      -
+      <span class="{{ 'status-ok' if scheduler_info.last_run_status == 'ok' else 'status-failed' }}">{{ scheduler_info.last_run_status }}</span>
+    {% else %}
+      No auto-refresh has run yet.
+    {% endif %}
+  </p>
 </section>
 
 <section class="panel">

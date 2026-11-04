@@ -4,6 +4,7 @@ refresh_recipe_bkc_page_cli.py scripts (see Server/flashtools/).
 Run: uvicorn app.main:app --host 127.0.0.1 --port 8000
 """
 
+import asyncio
 import csv
 import io
 import json
@@ -21,6 +22,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import auth, config
 from .jobs import JobManager
+from .scheduler import WeeklyRefreshScheduler
 
 sys.path.insert(0, str(config.FLASHTOOLS_DIR))
 from launcher_utils import redact_cmd_for_display  # noqa: E402
@@ -69,6 +71,32 @@ def _load_recipe() -> dict:
     return yaml.safe_load(config.RECIPE_PATH.read_text()) or {"firmware": {}}
 
 
+def _build_refresh_cmd(unattended: bool = False) -> list:
+    """Shared by the manual 'Refresh firmware from BKC page' button and the
+    weekly scheduler, so the two triggers can never run different commands.
+    unattended=True adds --no-auto-auth: a scheduled run has no one present
+    to complete an interactive Microsoft sign-in if the saved Graph token
+    ever expires, so it must fail fast and get noticed (via last-run status)
+    rather than hang forever waiting on a prompt nobody will see."""
+    cmd = [_python_exe(), "-u", _script("refresh_recipe_bkc_page_cli.py"),
+           "--output", str(config.RECIPE_PATH), "--firmware-dir", str(config.FIRMWARE_DIR)]
+    if unattended:
+        cmd += ["--no-auto-auth"]
+    return cmd
+
+
+scheduler = WeeklyRefreshScheduler(
+    state_file=APP_DIR / ".scheduler_state.json",
+    jobs=jobs,
+    build_cmd=lambda: _build_refresh_cmd(unattended=True),
+)
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    asyncio.create_task(scheduler.run_forever())
+
+
 # -- Pages ----------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
@@ -76,7 +104,10 @@ def index(request: Request, user: dict = Depends(auth.require_login)):
     recipe = _load_recipe()
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "user": user, "recipe": recipe.get("firmware", {}), "board_codes": BOARD_CODES},
+        {
+            "request": request, "user": user, "recipe": recipe.get("firmware", {}), "board_codes": BOARD_CODES,
+            "scheduler_info": scheduler.get_last_run_info(),
+        },
     )
 
 
@@ -100,10 +131,15 @@ def systems_template(user: dict = Depends(auth.require_login_api)):
 
 @app.post("/api/jobs/refresh")
 async def start_refresh_job(user: dict = Depends(auth.require_login_api)):
-    cmd = [_python_exe(), "-u", _script("refresh_recipe_bkc_page_cli.py"),
-           "--output", str(config.RECIPE_PATH), "--firmware-dir", str(config.FIRMWARE_DIR)]
+    cmd = _build_refresh_cmd()
     job = jobs.start(cmd, owner=user["oid"], kind="refresh")
     return {"job_id": job.id, "cmd_display": " ".join(redact_cmd_for_display(cmd))}
+
+
+@app.get("/api/scheduler/status")
+def scheduler_status(user: dict = Depends(auth.require_login_api)):
+    info = scheduler.get_last_run_info()
+    return info or {"last_run_at": None, "last_run_status": None}
 
 
 @app.post("/api/jobs/flash")

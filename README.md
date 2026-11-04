@@ -108,6 +108,39 @@ The "Refresh firmware from BKC page" button runs the vendored
    (`~/.config/microsoft-graph/token.json`) is then reused silently by
    every future web-triggered refresh.
 
+Both of these must be set up before the **weekly automatic refresh**
+described below will actually succeed - it uses the exact same service
+account/tokens, just triggered on a schedule instead of a button click.
+
+## 3b. Weekly automatic firmware refresh
+
+The app refreshes `recipe.yaml` on its own every **Sunday at 01:00**,
+with no one needing to click the button - same job, same command, just
+triggered by a background scheduler (`app/scheduler.py`) instead of a
+browser request.
+
+- **Timezone**: "01:00" means the server process's own local time - if
+  you deploy via Docker, that's the container's timezone (UTC by default
+  unless you set one), not necessarily the admin's timezone. Set the
+  `TZ` environment variable in `docker-compose.yml`/`.env` if you need a
+  specific timezone (e.g. `TZ=America/Los_Angeles`).
+- **Unattended = no interactive sign-in retry**: the scheduled run passes
+  `--no-auto-auth`, so if the saved Microsoft Graph token has expired, it
+  fails fast (visible in the last-run status on the page) rather than
+  hanging forever waiting for a sign-in nobody is present to complete -
+  re-run the manual one-time Graph sign-in (step 2 above) to fix it.
+- **Visibility**: the firmware section on the main page shows "Last
+  auto-refresh: <date> <time> - ok/failed (exit N)", read from
+  `app/.scheduler_state.json` (small local state file, not meant to be
+  committed - already in `.gitignore`).
+- **Changing the schedule**: edit `SCHEDULE_WEEKDAY`/`SCHEDULE_HOUR` at
+  the top of `app/scheduler.py` (Python's `datetime.weekday()`
+  convention: Monday=0 ... Sunday=6).
+- **Restart-safe by design**: it's a polling loop (checks every 60s "is
+  it the scheduled day/hour, and have I not already run this ISO week"),
+  not a single long `sleep()` - a server restart mid-week just resumes
+  checking, it doesn't lose or double-fire the weekly run.
+
 ## 4. Running via Docker
 
 ```bash
