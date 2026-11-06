@@ -98,6 +98,12 @@ el("clear-targets-btn").addEventListener("click", () => {
 });
 
 el("confirm-flash").addEventListener("change", updateRunGating);
+el("max-parallel").addEventListener("input", updateRunGating);
+
+function maxParallelIsValid() {
+  const raw = el("max-parallel").value;
+  return /^[1-9][0-9]*$/.test(raw.trim());
+}
 
 // Manual firmware override: show the real (untruncated) filename next to
 // each file input, a clear (x) button once one's picked, a per-board badge
@@ -233,6 +239,7 @@ async function startFlashJob(dryRun) {
   if (el("bmc-user").value) form.append("bmc_user", el("bmc-user").value);
   if (el("bmc-pass").value) form.append("bmc_pass", el("bmc-pass").value);
   if (el("fvddr-token").value) form.append("fvddr_token", el("fvddr-token").value);
+  form.append("max_parallel", el("max-parallel").value);
 
   // Manual firmware override: any file the user picked under "1b." gets
   // sent as fw_<board>_<component>, matched server-side to only the rows
@@ -293,14 +300,19 @@ function streamJob(jobId, onDone) {
 }
 
 function setRunButtonsEnabled(enabled) {
-  el("dry-run-btn").disabled = !enabled || targetsRows.length === 0;
-  el("flash-now-btn").disabled = !enabled || !el("confirm-flash").checked || targetsRows.length === 0;
+  const ready = enabled && targetsRows.length > 0 && maxParallelIsValid();
+  el("dry-run-btn").disabled = !ready;
+  el("flash-now-btn").disabled = !ready || !el("confirm-flash").checked;
 }
 
 function updateRunGating() {
+  const validMaxParallel = maxParallelIsValid();
+  el("max-parallel").classList.toggle("invalid", !validMaxParallel);
   setRunButtonsEnabled(true);
   const hint = el("run-hint");
-  if (targetsRows.length === 0) {
+  if (!validMaxParallel) {
+    hint.textContent = "Max parallel must be a positive whole number.";
+  } else if (targetsRows.length === 0) {
     hint.textContent = "Upload a target CSV (or add a row) above to enable Dry Run / Flash Now.";
   } else if (!el("confirm-flash").checked) {
     hint.textContent = `${targetsRows.length} target system(s) loaded. Check the box above to enable Flash Now (Dry Run is always safe).`;

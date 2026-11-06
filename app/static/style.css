@@ -100,5 +100,9 @@ input[type=text], input[type=password] { padding: 0.3rem; margin-left: 0.4rem; }
 .fw-clear-btn:hover { color: #c0392b; }
 .password-field { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: 0.4rem; }
 .password-field input[type=password], .password-field input[type=text] { margin-left: 0; }
+.credentials-row { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end; }
+.credentials-row label { margin: 0.4rem 0; }
+#max-parallel { width: 70px; }
+#max-parallel.invalid { background: #fdecea; border-color: #c0392b; }
 .button-small { padding: 0.2rem 0.5rem; font-size: 0.78rem; }
 #targets-table { margin-top: 0.75rem; }

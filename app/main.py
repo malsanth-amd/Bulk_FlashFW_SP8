@@ -150,12 +150,17 @@ async def start_flash_job(
     bmc_user: str = Form(""),
     bmc_pass: str = Form(""),
     fvddr_token: str = Form(""),
+    max_parallel: str = Form("4"),
     user: dict = Depends(auth.require_login_api),
 ):
     csv_bytes = await targets_csv.read()
     rows = list(csv.DictReader(io.StringIO(csv_bytes.decode("utf-8"))))
     if not rows:
         return JSONResponse({"error": "No target systems found in the uploaded CSV."}, status_code=400)
+
+    # Server-side validation too, never trust the client's own check alone.
+    if not max_parallel.strip().isdigit() or int(max_parallel) < 1:
+        return JSONResponse({"error": f"Max parallel must be a positive whole number, got '{max_parallel}'."}, status_code=400)
 
     # flash_fleet.py has no top-level --bmc-user/--bmc-pass flags - those are
     # per-row CSV columns only (a row's own value always wins). The web
@@ -217,7 +222,7 @@ async def start_flash_job(
     # dispatches to flash_system.py per system, which already defaults both
     # to paths relative to Server/flashtools/ (see launcher_utils.app_dir()).
     cmd = [_python_exe(), "-u", _script("flash_fleet.py"), str(tmp_csv),
-           "--log-dir", str(config.FLEET_LOG_DIR)]
+           "--log-dir", str(config.FLEET_LOG_DIR), "--max-parallel", max_parallel]
     if dry_run:
         cmd += ["--dry-run"]
     else:

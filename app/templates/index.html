@@ -79,14 +79,17 @@
 
 <section class="panel">
   <h2>3. BMC credentials</h2>
-  <p class="hint">Applied to any target row that doesn't specify its own bmc_user/bmc_pass column.</p>
-  <label>BMC user <input type="text" id="bmc-user" placeholder="root"></label>
-  <label>BMC password
-    <span class="password-field">
-      <input type="password" id="bmc-pass">
-      <button type="button" id="toggle-pass-btn" class="button button-small">Show</button>
-    </span>
-  </label>
+  <p class="hint">Username/password applied to any target row that doesn't specify its own bmc_user/bmc_pass column.</p>
+  <div class="credentials-row">
+    <label>BMC user <input type="text" id="bmc-user" placeholder="root"></label>
+    <label>BMC password
+      <span class="password-field">
+        <input type="password" id="bmc-pass">
+        <button type="button" id="toggle-pass-btn" class="button button-small">Show</button>
+      </span>
+    </label>
+    <label>Max parallel <input type="number" id="max-parallel" min="1" value="4"></label>
+  </div>
   <p class="hint">
     AC-cycle (needed for FPGA/HPM flashes): automatically uses the FVDDR System Tracker
     by system name - no setup needed unless that FVDDR instance requires an admin token.
